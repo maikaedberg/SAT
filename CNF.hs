@@ -2,13 +2,15 @@
 module CNF where
 
 import Data.List
+import Data.Set (Set)
+import qualified Data.Set as Set
 
 type Var = Int
 data Lit = Lit    { var :: Var , pol :: Bool }                 deriving (Ord,Show,Eq)
-data Cls = BigOr  { literals :: [Lit] }                        deriving (Show,Eq)
-data CNF = BigAnd { vars :: [Var], clauses  :: [Cls] }         deriving (Show,Eq)
+data Cls = BigOr  { literals :: Set Lit }                        deriving (Show,Eq)
+data CNF = BigAnd { vars :: Set Var, clauses  :: Set Cls }         deriving (Show,Eq)
 
-type Subst = [(Var,Bool)]
+type Subst = Set (Var,Bool)
 
 -- destructor extracting a variable/boolean pair from a literal
 unLit :: Lit -> (Var,Bool)
@@ -37,5 +39,5 @@ numClss :: CNF -> Int
 numClss = length . clauses
 
 numLits :: CNF -> Int
-numLits = sum . map (length . literals) . clauses
+numLits = sum . map (Set.size . literals) . clauses
 

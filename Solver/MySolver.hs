@@ -11,9 +11,8 @@ fill []     subst = subst
 fill (v:vars) subst = 
   if elem v [fst s | s <- subst]
     then fill vars subst
-    else fill vars (subst ++ [(v, True)])
+    else fill vars ((v, True):subst)
     
-
 solve :: [Cls] -> Maybe Subst
 solve [] = Just []
 solve (c:clauses) =
