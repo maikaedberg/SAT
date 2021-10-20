@@ -2,8 +2,7 @@
 module CNF where
 
 import Data.List
-import Data.Set (Set)
-import qualified Data.Set as Set
+import Data.Set 
 
 type Var = Int
 data Lit = Lit    { var :: Var , pol :: Bool }                 deriving (Ord,Show,Eq)
@@ -25,10 +24,10 @@ prettyLit :: Lit -> String
 prettyLit (Lit v b) = (if b then "" else "-") ++ "x" ++ show v
 
 prettyCls :: Cls -> String
-prettyCls = intercalate " | " . map prettyLit . literals
+prettyCls = intercalate " | " . toList (map prettyLit . literals)
 
 prettyCNF :: CNF -> String
-prettyCNF = intercalate " & " . map (parens . prettyCls) . clauses
+prettyCNF = intercalate " & " . toList (map (parens . prettyCls) . clauses)
   where
     parens :: String -> String
     parens s = "(" ++ s ++ ")"
