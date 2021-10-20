@@ -6,20 +6,33 @@ import CNF.Eval
 import Data.List
 import Data.Maybe
 
+fill :: [Var] -> Subst -> Subst
+fill []     subst = subst
+fill (v:vars) subst = 
+  if elem v [fst s | s <- subst]
+    then fill vars subst
+    else fill vars (subst ++ [(v, True)])
+    
+
 solve :: [Cls] -> Maybe Subst
-solve [] = return []
-solve (c:clauses)
-    | length cond_x > 0   = do
-            rho <- solve cond_x
-            return ((unLit cond):rho)
-    | length cond_negx > 0 = do
-            rho <- solve cond_negx
-            return ((unLit (negLit cond)):rho)
-    | otherwise            = Nothing
+solve [] = Just []
+solve (c:clauses) =
+  -- If it contains an empty clause then it is trivially unsatisfiable,
+  if (elem ( BigOr [] ) (c:clauses))
+    then Nothing
+    else 
+      case rho_x of 
+        Just l -> Just ((unLit cond):l)
+        Nothing -> 
+          case rho_negx of
+            Just l -> Just ((unLit (negLit cond)):l)
+            Nothing -> Nothing
     where
-        cond      = head (literals c)
-        cond_x    = condition cond (c:clauses)
-        cond_negx = condition (negLit cond) (c:clauses)
+      cond      = head (literals c)
+      cond_x    = condition cond (c:clauses)
+      cond_negx = condition (negLit cond) (c:clauses)
+      rho_x     = (solve cond_x)
+      rho_negx  = (solve cond_negx)
 
 filterLit :: Lit -> Cls -> Maybe Cls
 filterLit l c
@@ -35,4 +48,9 @@ condition l (c:cs) =
         Just filtered ->  filtered:(condition l cs)
 
 solution :: CNF -> Maybe Subst
-solution cnf = solve (clauses cnf)
+solution cnf = 
+  case solve (clauses cnf) of
+    Nothing -> Nothing
+    Just sub -> do
+            Just (fill (vars cnf) sub)
+
