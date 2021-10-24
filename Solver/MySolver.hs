@@ -32,19 +32,19 @@ solve (c:clauses) =
       rho_x     = (solve cond_x)
       rho_negx  = (solve cond_negx)
 
-find_unit_clause :: [Cls] -> [Cls] -> ([Cls], Bool)
+find_uc :: [Cls] -> [Cls] -> ([Cls], Bool)
 -- looks for a unit clause 
 -- returns unit clause at the head of the list if found
 -- othewrise return what was given initally
-find_unit_clause [] accum_cls = (accum_cls, False)
-find_unit_clause (c:cls) accum_cls
+find_uc [] accum_cls = (accum_cls, False)
+find_uc (c:cls) accum_cls
   | (length (literals c)) == 1 = (c:(accum_cls ++ cls), True)
-  | otherwise                  = find_unit_clause cls (c:accum_cls)
+  | otherwise                  = find_uc cls (c:accum_cls)
    
-solve_up :: [Cls] -> Maybe Subst
-solve_up [] = Just []
-solve_up (c:clauses) =
-  if (elem ( BigOr [] ) (c:clauses))
+solve_uc :: [Cls] -> Maybe Subst
+solve_uc [] = Just []
+solve_uc clauses =
+  if (elem ( BigOr [] ) clauses)
     then Nothing -- If it contains an empty clause then it is trivially unsatisfiable,
     else
       case rho_x of 
@@ -54,27 +54,27 @@ solve_up (c:clauses) =
             Just l -> Just ((unLit (negLit cond)):l)
             Nothing -> Nothing
     where
-      (new_clauses, found_unit) = find_unit_clause (c:clauses) []
-      cond = literals (head new_clauses) !! 0
-      rest_clauses = tail new_clauses
-      cond_x    = condition cond rest_clauses
-      cond_negx = condition (negLit cond) rest_clauses
-      rho_x     = (solve_up cond_x)
+      (new_clauses, found_uc) = find_uc clauses []
+      cond      = head (literals (head new_clauses))
+      cond_x    = condition cond new_clauses
+      cond_negx = condition (negLit cond) new_clauses
+      rho_x     = (solve_uc cond_x)
       rho_negx  = 
-        case found_unit of
+        case found_uc of
           True -> Nothing
-          False -> (solve_up cond_negx)
+          False ->  (solve_uc cond_negx)
+
 
 neg_lit_in :: Lit -> [Cls] -> Bool
--- returns True if the negation of the literal is in clauses
+-- returns True if the negation of the literal is in one of the clauses
 --         False otherwise
 neg_lit_in lit [] = False
 neg_lit_in lit (c:clauses) = (elem (negLit lit) (literals c)) || (neg_lit_in lit clauses)
 
-solve_u_le :: [Cls] -> Maybe Subst -- unit propogation ++ literal elimination
-solve_u_le [] = Just []
-solve_u_le (c:clauses) =
-  if (elem ( BigOr [] ) (c:clauses))
+solve_uc_le :: [Cls] -> Maybe Subst
+solve_uc_le [] = Just []
+solve_uc_le clauses =
+  if (elem ( BigOr [] ) clauses)
     then Nothing -- If it contains an empty clause then it is trivially unsatisfiable,
     else
       case rho_x of 
@@ -84,18 +84,18 @@ solve_u_le (c:clauses) =
             Just l -> Just ((unLit (negLit cond)):l)
             Nothing -> Nothing
     where
-      (new_clauses, found_unit) = find_unit_clause (c:clauses) []
-      cond = literals (head new_clauses) !! 0
-      rest_clauses = tail new_clauses
-      cond_x    = condition cond rest_clauses
-      cond_negx = condition (negLit cond) rest_clauses
-      rho_x     = solve_u_le cond_x
+      (new_clauses, found_uc) = find_uc clauses []
+      cond      = head (literals (head new_clauses))
+      found_neg_lit  = neg_lit_in cond new_clauses
+      cond_x    = condition cond new_clauses
+      cond_negx = condition (negLit cond) new_clauses
+      rho_x     = (solve_uc_le cond_x)
       rho_negx  = 
-        case found_unit of
+        case found_uc of
           True -> Nothing
-          False ->
-            case neg_lit_in cond rest_clauses of
-              True -> solve_u_le cond_negx
+          False -> 
+            case found_neg_lit of
+              True -> (solve_uc_le cond_negx)
               False -> Nothing
 
 
@@ -133,7 +133,7 @@ subsumption cnf = BigAnd (vars cnf) (preprocess (clauses cnf))
 
 solution :: CNF -> Maybe Subst
 solution cnf = 
-  case solve_u_le (clauses cnf) of
+  case solve_uc_le (clauses cnf) of
     Nothing -> Nothing
     Just sub -> Just (fill (vars cnf) sub)
 
