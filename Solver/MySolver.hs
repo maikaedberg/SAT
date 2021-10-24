@@ -16,10 +16,9 @@ fill (v:vars) subst =
 solve :: [Cls] -> Maybe Subst
 solve [] = Just []
 solve (c:clauses) =
-  -- If it contains an empty clause then it is trivially unsatisfiable,
   if (elem ( BigOr [] ) (c:clauses))
-    then Nothing
-    else 
+    then Nothing -- If it contains an empty clause then it is trivially unsatisfiable,
+    else
       case rho_x of 
         Just l -> Just ((unLit cond):l)
         Nothing -> 
@@ -30,6 +29,34 @@ solve (c:clauses) =
       cond      = head (literals c)
       cond_x    = condition cond (c:clauses)
       cond_negx = condition (negLit cond) (c:clauses)
+      rho_x     = (solve cond_x)
+      rho_negx  = (solve cond_negx)
+
+find_unit_clause :: [Cls] -> [Cls] -> Maybe (Lit, [Cls])
+find_unit_clause [] _ = Nothing
+find_unit_clause (c:cls) accum_cls
+  | (length (literals c)) == 1 = Just ((literals c) !! 0, accum_cls ++ cls)
+  | otherwise                  = find_unit_clause cls (c:accum_cls)
+   
+solve_up :: [Cls] -> Maybe Subst
+solve_up [] = Just []
+solve_up (c:clauses) =
+  if (elem ( BigOr [] ) (c:clauses))
+    then Nothing -- If it contains an empty clause then it is trivially unsatisfiable,
+    else
+      case rho_x of 
+        Just l -> Just ((unLit cond):l)
+        Nothing -> 
+          case rho_negx of
+            Just l -> Just ((unLit (negLit cond)):l)
+            Nothing -> Nothing
+    where
+      (cond, rest) = 
+        case find_unit_clause (c:clauses) [] of
+          Nothing -> (head (literals c), c:clauses) -- didn't find any unit clauses
+          Just l -> l
+      cond_x    = condition cond rest
+      cond_negx = condition (negLit cond) rest
       rho_x     = (solve cond_x)
       rho_negx  = (solve cond_negx)
 
