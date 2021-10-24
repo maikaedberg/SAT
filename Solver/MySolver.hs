@@ -46,10 +46,30 @@ condition l (c:cs) =
         Nothing -> condition l cs
         Just filtered ->  filtered:(condition l cs)
 
+--https://stackoverflow.com/questions/47232335/check-if-list-is-a-sublist-of-another-list
+subList :: Eq a => [a] -> [a] -> Bool
+subList [] [] = True
+subList _ []    = False
+subList [] _    = True
+subList (x:xs) (y:ys) 
+    | x == y    = subList xs ys   
+    | otherwise = subList (x:xs) ys
+
+preprocess :: [Cls] -> [Cls]
+preprocess [] = []
+preprocess (c:cs)
+  | elem True [subList (literals c) y | y <- (map literals cs)] = preprocess cs
+  | otherwise                         = c:(preprocess cs)
+
+subsumption :: CNF -> CNF
+subsumption cnf = BigAnd (vars cnf) (preprocess (clauses cnf))
+
 solution :: CNF -> Maybe Subst
 solution cnf = 
-  case solve (clauses cnf) of
+  case solve (clauses cnf') of
     Nothing -> Nothing
     Just sub -> do
-            Just (fill (vars cnf) sub)
+            Just (fill (vars cnf') sub)
+  where
+    cnf' = subsumption cnf
 
