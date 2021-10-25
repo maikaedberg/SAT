@@ -12,25 +12,6 @@ fill (v:vars) subst =
   if elem v [fst s | s <- subst]
     then fill vars subst
     else fill vars ((v, True):subst)
-    
-solve :: [Cls] -> Maybe Subst
-solve [] = Just []
-solve (c:clauses) =
-  if (elem ( BigOr [] ) (c:clauses))
-    then Nothing -- If it contains an empty clause then it is trivially unsatisfiable,
-    else
-      case rho_x of 
-        Just l -> Just ((unLit cond):l)
-        Nothing -> 
-          case rho_negx of
-            Just l -> Just ((unLit (negLit cond)):l)
-            Nothing -> Nothing
-    where
-      cond      = head (literals c)
-      cond_x    = condition cond (c:clauses)
-      cond_negx = condition (negLit cond) (c:clauses)
-      rho_x     = (solve cond_x)
-      rho_negx  = (solve cond_negx)
 
 find_uc :: [Cls] -> [Cls] -> ([Cls], Bool)
 -- looks for a unit clause 
@@ -40,30 +21,6 @@ find_uc [] accum_cls = (accum_cls, False)
 find_uc (c:cls) accum_cls
   | (length (literals c)) == 1 = (c:(accum_cls ++ cls), True)
   | otherwise                  = find_uc cls (c:accum_cls)
-   
-solve_uc :: [Cls] -> Maybe Subst
-solve_uc [] = Just []
-solve_uc clauses =
-  if (elem ( BigOr [] ) clauses)
-    then Nothing -- If it contains an empty clause then it is trivially unsatisfiable,
-    else
-      case rho_x of 
-        Just l -> Just ((unLit cond):l)
-        Nothing -> 
-          case rho_negx of
-            Just l -> Just ((unLit (negLit cond)):l)
-            Nothing -> Nothing
-    where
-      (new_clauses, found_uc) = find_uc clauses []
-      cond      = head (literals (head new_clauses))
-      cond_x    = condition cond new_clauses
-      cond_negx = condition (negLit cond) new_clauses
-      rho_x     = (solve_uc cond_x)
-      rho_negx  = 
-        case found_uc of
-          True -> Nothing
-          False ->  (solve_uc cond_negx)
-
 
 neg_lit_in :: Lit -> [Cls] -> Bool
 -- returns True if the negation of the literal is in one of the clauses
@@ -71,11 +28,11 @@ neg_lit_in :: Lit -> [Cls] -> Bool
 neg_lit_in lit [] = False
 neg_lit_in lit (c:clauses) = (elem (negLit lit) (literals c)) || (neg_lit_in lit clauses)
 
-solve_uc_le :: [Cls] -> Maybe Subst
-solve_uc_le [] = Just []
-solve_uc_le clauses =
+solve :: [String] -> [Cls] -> Maybe Subst
+solve _ [] = Just []
+solve optimisations clauses =
   if (elem ( BigOr [] ) clauses)
-    then Nothing -- If it contains an empty clause then it is trivially unsatisfiable,
+    then Nothing -- If it contains an empty clause then it is trivially unsatisfiable
     else
       case rho_x of 
         Just l -> Just ((unLit cond):l)
@@ -84,18 +41,24 @@ solve_uc_le clauses =
             Just l -> Just ((unLit (negLit cond)):l)
             Nothing -> Nothing
     where
-      (new_clauses, found_uc) = find_uc clauses []
+      (new_clauses, found_uc) = 
+        case elem "-up" optimisations of
+          True -> find_uc clauses []
+          False -> (clauses, False)
       cond      = head (literals (head new_clauses))
-      found_neg_lit  = neg_lit_in cond new_clauses
+      found_neg_lit  = 
+        case elem "-ple" optimisations of
+          True -> neg_lit_in cond new_clauses
+          False -> True
       cond_x    = condition cond new_clauses
       cond_negx = condition (negLit cond) new_clauses
-      rho_x     = (solve_uc_le cond_x)
+      rho_x     = (solve optimisations cond_x)
       rho_negx  = 
         case found_uc of
           True -> Nothing
           False -> 
             case found_neg_lit of
-              True -> (solve_uc_le cond_negx)
+              True -> (solve optimisations cond_negx)
               False -> Nothing
 
 
@@ -125,27 +88,20 @@ subList (x:xs) (y:ys)
 preprocess :: [Cls] -> [Cls]
 preprocess [] = []
 preprocess (c:cs)
-  | elem True [subList (literals c) y | y <- (map literals cs)] = preprocess cs
+  | elem True [subList y (literals c) | y <- (map literals cs)] = preprocess cs
   | otherwise                         = c:(preprocess cs)
 
 subsumption :: CNF -> CNF
 subsumption cnf = BigAnd (vars cnf) (preprocess (clauses cnf))
 
-solution :: CNF -> Maybe Subst
-solution cnf = 
-  case solve_uc_le (clauses cnf) of
+solution :: [String] -> CNF -> Maybe Subst
+solution optimisations cnf = 
+  case solve optimisations (clauses cnf') of
     Nothing -> Nothing
-    Just sub -> Just (fill (vars cnf) sub)
-
-
--- check for correctness + performance
-
-solution_subsumption :: CNF -> Maybe Subst
-solution_subsumption cnf = 
-  case solve (clauses cnf') of
-    Nothing -> Nothing
-    Just sub -> do
-            Just (fill (vars cnf') sub)
+    Just sub -> Just (fill (vars cnf') sub)
   where
-    cnf' = subsumption cnf
+    cnf' = 
+      case elem "-ss" optimisations of
+        True -> subsumption cnf
+        False -> cnf
 
