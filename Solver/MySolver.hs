@@ -1,4 +1,4 @@
-module Solver.MySolver (solution) where
+module Solver.MySolver (solution, cnfTo3CNF) where
 
 import CNF
 import CNF.Eval
@@ -9,7 +9,7 @@ import Data.Maybe
 fill :: [Var] -> Subst -> Subst
 fill []     subst = subst
 fill (v:vars) subst = 
-  if elem v [fst s | s <- subst]
+  if elem v (fst (unzip subst)) 
     then fill vars subst
     else fill vars ((v, True):subst)
     
@@ -135,7 +135,69 @@ solution :: CNF -> Maybe Subst
 solution cnf = 
   case solve_uc_le (clauses cnf) of
     Nothing -> Nothing
-    Just sub -> Just (fill (vars cnf) sub)
+    Just sub -> Just (fill (vars cnf') sub) where 
+      cnf' = cnfTo3CNF cnf
+
+newVar :: [Var] -> Var
+newVar = foldr (\v -> max (v+1) ) 1 
+
+initNewVars :: Int -> [Var] -> [Var]
+initNewVars n vars = [minNewVar..(minNewVar + n)] where 
+  minNewVar = newVar vars
+
+createClauses :: Int -> [Var] -> [Var] -> Cls -> [Cls]
+createClauses 0 vars newvars oldClause = [BigOr [l1, l2, z]] where
+  lits = literals oldClause
+  lenOC = length lits
+  l1 = lits!!(lenOC - 2)
+  l2 = last lits 
+  z = Lit (last newvars) True
+createClauses k vars newvars oldClause = BigOr [l, z1, z2] : createClauses (k-1) vars newvars oldClause where 
+  lits = literals oldClause 
+  lenOC = length lits 
+  l = lits!!(lenOC - (k+3))
+  z1 = Lit (newvars!!(lenOC - (k+1))) False
+  z2 = Lit (newvars!!(lenOC - (k+2))) True
+
+cnfTo3CNF_aux :: [Var] -> [Cls] -> ([Var], [Cls])
+cnfTo3CNF_aux vars []      = (vars, [])
+cnfTo3CNF_aux vars (c:cls) = case length (literals c) of
+  0 -> (vars, c:cls) -- If there is a clause of length 0 then the CNF is unsatisfiable 
+  1 -> (newVars, newClauses) where 
+    newVarList  = initNewVars 2 vars
+    updatedVars = newVarList ++ vars
+    res         = cnfTo3CNF_aux updatedVars cls
+    newVars     = fst res
+    newLit1     = Lit (head newVarList) True 
+    newLit2     = Lit (newVarList!!1) True
+    newClauses  = BigOr ([newLit1, newLit2] ++ literals c) : snd res
+  2 -> (newVars, newClauses) where 
+    newVar1     = newVar vars
+    updatedVars = newVar1 : vars 
+    res         = cnfTo3CNF_aux vars cls 
+    newVars     = fst res
+    newLit1     = Lit newVar1 True 
+    newClauses  = BigOr (newLit1 : literals c) : snd res
+  3 -> (newVars, c:newClauses) where 
+    res        = cnfTo3CNF_aux vars cls
+    newVars    = fst res
+    newClauses = snd res
+  otherwise -> (newVars, newClauses) where 
+    k = length (literals c)
+    newVarList  = initNewVars (k - 3) vars 
+    clause      = literals c 
+    c1          = BigOr (take 2 clause ++ [Lit (head newVarList) True])
+    clauses     = c1 : createClauses (k - 4) vars newVarList c
+    updatedVars = newVarList ++ vars
+    res         = cnfTo3CNF_aux updatedVars cls
+    newVars     = fst res
+    newClauses  = clauses ++ snd res
+
+cnfTo3CNF :: CNF -> CNF
+cnfTo3CNF (BigAnd vars clauses) = BigAnd newvars newclauses where
+  res        = cnfTo3CNF_aux vars clauses
+  newvars    = fst res
+  newclauses = snd res
 
 
 -- check for correctness + performance
