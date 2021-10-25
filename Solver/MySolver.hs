@@ -119,8 +119,12 @@ solution :: [String] -> CNF -> Maybe Subst
 solution optimisations cnf = 
   case solve optimisations (clauses cnf') of
     Nothing -> Nothing
-    Just sub -> Just (fill (vars cnf') sub) where 
-      cnf' = cnfTo3CNF cnf
+    Just sub -> Just (fill (vars cnf') sub)
+  where
+    cnf' = 
+      case elem "-ss" optimisations of
+        True -> subsumption cnf
+        False -> cnf
 
 newVar :: [Var] -> Var
 newVar = foldr (\v -> max (v+1) ) 1 
@@ -182,19 +186,4 @@ cnfTo3CNF (BigAnd vars clauses) = BigAnd newvars newclauses where
   res        = cnfTo3CNF_aux vars clauses
   newvars    = fst res
   newclauses = snd res
-
-
--- check for correctness + performance
-
-solution_subsumption :: CNF -> Maybe Subst
-solution_subsumption cnf = 
-  case solve (clauses cnf') of
-    Nothing -> Nothing
-    Just sub -> do
-            Just (fill (vars cnf') sub)
-  where
-    cnf' = 
-      case elem "-ss" optimisations of
-        True -> subsumption cnf
-        False -> cnf
 
