@@ -115,17 +115,6 @@ preprocess (c:cs)
 subsumption :: CNF -> CNF
 subsumption cnf = BigAnd (vars cnf) (preprocess (clauses cnf))
 
-solution :: [String] -> CNF -> Maybe Subst
-solution optimisations cnf = 
-  case solve optimisations (clauses cnf') of
-    Nothing -> Nothing
-    Just sub -> Just (fill (vars cnf') sub)
-  where
-    cnf' = 
-      case elem "-ss" optimisations of
-        True -> subsumption cnf
-        False -> cnf
-
 newVar :: [Var] -> Var
 newVar = foldr (\v -> max (v+1) ) 1 
 
@@ -187,3 +176,17 @@ cnfTo3CNF (BigAnd vars clauses) = BigAnd newvars newclauses where
   newvars    = fst res
   newclauses = snd res
 
+solution :: [String] -> CNF -> Maybe Subst
+solution optimisations cnf = 
+  case solve optimisations (clauses cnf') of
+    Nothing -> Nothing
+    Just sub -> Just (fill (vars cnf') sub)
+  where
+    cnf' = 
+      case elem "-ss" optimisations of
+        True -> subsumption cnf
+        False -> cnf
+    cnf'' =
+      case elem "-3cnf" optimisations of
+        True -> cnfTo3CNF cnf'
+        False -> cnf'
