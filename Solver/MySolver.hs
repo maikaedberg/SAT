@@ -13,24 +13,23 @@ fill (v:vars) subst =
     then fill vars subst
     else fill vars ((v, True):subst)
 
-find_min_l:: [([Cls], Lit)] -> (Int, Lit)
-find_min_l [(cls, lit)] = (length cls, lit)
-find_min_l ((cls, lit):clslits) = 
-  if length cls < curr_min 
-    then (length cls, lit)
-    else (curr_min, curr_lit)
-  where 
-    (curr_min, curr_lit) = find_min_l clslits
+-- https://baldur.iti.kit.edu/sat/files/2019/l08.pdf
+count_occurence :: Lit -> [Cls] -> Int
+count_occurence lit [] = 0
+count_occurence lit (c:clauses) = 
+  if (elem lit (literals c))
+    then count_occurence lit clauses + 1
+    else count_occurence lit clauses
 
-choose_lit :: [Cls] -> Lit
-choose_lit clauses = 
-  snd (find_min_l (conditioned ++ conditioned_neg))
+greedy :: [Cls] -> Lit
+greedy clauses = lit
   where
-    --condition :: Lit -> [Cls] -> [Cls]
-    conditioned =     [(condition l          clauses, l) | l <- clauseLits clauses]
-    conditioned_neg = [(condition (negLit l) clauses, l) | l <- clauseLits clauses]
-
-
+    no_occur = [(count_occurence l clauses, l) | l <- clauseLits clauses] -- [(int, lit)]
+    max_occur = maximum [fst occur | occur <- no_occur] -- int
+    lit = 
+      case (lookup max_occur no_occur) of
+        Just lit -> lit
+        Nothing -> Lit 0 False -- will never happen
 
 find_uc :: [Cls] -> [Cls] -> ([Cls], Bool)
 -- looks for a unit clause 
@@ -65,8 +64,8 @@ solve optimisations clauses =
           True -> find_uc clauses []
           False -> (clauses, False)
       cond      = 
-        case (elem "-branching" optimisations) && (not found_uc) of
-          True -> choose_lit new_clauses
+        case (elem "-greedy" optimisations) && (not found_uc) of
+          True -> greedy new_clauses
           False -> head (literals (head new_clauses))
       found_neg_lit  = 
         case elem "-ple" optimisations of
