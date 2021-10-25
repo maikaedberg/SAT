@@ -48,4 +48,9 @@ numLits :: CNF -> Int
 --numLits = sum . Data.Set.map (length . literals) . clauses
 numLits = sum . map (length . literals) . clauses
 
-
+clauseLits :: [Cls] -> [Lit]
+clauseLits [] = []
+clauseLits (c:cls) = 
+  [l | l <- literals c, not (elem l prev)] ++ prev
+  where
+    prev = clauseLits cls

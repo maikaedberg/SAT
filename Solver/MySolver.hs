@@ -13,6 +13,25 @@ fill (v:vars) subst =
     then fill vars subst
     else fill vars ((v, True):subst)
 
+find_min_l:: [([Cls], Lit)] -> (Int, Lit)
+find_min_l [(cls, lit)] = (length cls, lit)
+find_min_l ((cls, lit):clslits) = 
+  if length cls < curr_min 
+    then (length cls, lit)
+    else (curr_min, curr_lit)
+  where 
+    (curr_min, curr_lit) = find_min_l clslits
+
+choose_lit :: [Cls] -> Lit
+choose_lit clauses = 
+  snd (find_min_l (conditioned ++ conditioned_neg))
+  where
+    --condition :: Lit -> [Cls] -> [Cls]
+    conditioned =     [(condition l          clauses, l) | l <- clauseLits clauses]
+    conditioned_neg = [(condition (negLit l) clauses, l) | l <- clauseLits clauses]
+
+
+
 find_uc :: [Cls] -> [Cls] -> ([Cls], Bool)
 -- looks for a unit clause 
 -- returns unit clause at the head of the list if found
@@ -45,7 +64,10 @@ solve optimisations clauses =
         case elem "-up" optimisations of
           True -> find_uc clauses []
           False -> (clauses, False)
-      cond      = head (literals (head new_clauses))
+      cond      = 
+        case (elem "-branching" optimisations) && (not found_uc) of
+          True -> choose_lit new_clauses
+          False -> head (literals (head new_clauses))
       found_neg_lit  = 
         case elem "-ple" optimisations of
           True -> neg_lit_in cond new_clauses
