@@ -138,29 +138,13 @@ createClauses k vars newvars oldClause = BigOr [l, z1, z2] : createClauses (k-1)
 
 cnfTo3CNF_aux :: [Var] -> [Cls] -> ([Var], [Cls])
 cnfTo3CNF_aux vars []      = (vars, [])
-cnfTo3CNF_aux vars (c:cls) = case length (literals c) of
-  0 -> (vars, c:cls) -- If there is a clause of length 0 then the CNF is unsatisfiable 
-  1 -> (newVars, newClauses) where 
-    newVarList  = initNewVars 2 vars
-    updatedVars = newVarList ++ vars
-    res         = cnfTo3CNF_aux updatedVars cls
-    newVars     = fst res
-    newLit1     = Lit (head newVarList) True 
-    newLit2     = Lit (newVarList!!1) True
-    newClauses  = BigOr ([newLit1, newLit2] ++ literals c) : snd res
-  2 -> (newVars, newClauses) where 
-    newVar1     = newVar vars
-    updatedVars = newVar1 : vars 
-    res         = cnfTo3CNF_aux vars cls 
-    newVars     = fst res
-    newLit1     = Lit newVar1 True 
-    newClauses  = BigOr (newLit1 : literals c) : snd res
-  3 -> (newVars, c:newClauses) where 
+cnfTo3CNF_aux vars (c:cls)
+  | k == 0 = (vars, [c]) -- If there is a clause of length 0 then the CNF is unsatisfiable 
+  | k <= 3 = (newVars, c:newClauses) where 
     res        = cnfTo3CNF_aux vars cls
     newVars    = fst res
     newClauses = snd res
-  otherwise -> (newVars, newClauses) where 
-    k = length (literals c)
+  | k > 3 = (newVars, newClauses) where 
     newVarList  = initNewVars (k - 3) vars 
     clause      = literals c 
     c1          = BigOr (take 2 clause ++ [Lit (head newVarList) True])
@@ -169,6 +153,7 @@ cnfTo3CNF_aux vars (c:cls) = case length (literals c) of
     res         = cnfTo3CNF_aux updatedVars cls
     newVars     = fst res
     newClauses  = clauses ++ snd res
+  where k = length (literals c)
 
 cnfTo3CNF :: CNF -> CNF
 cnfTo3CNF (BigAnd vars clauses) = BigAnd newvars newclauses where
