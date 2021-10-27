@@ -136,24 +136,24 @@ createClauses k vars newvars oldClause = BigOr [l, z1, z2] : createClauses (k-1)
   z1 = Lit (newvars!!(lenOC - (k+1))) False
   z2 = Lit (newvars!!(lenOC - (k+2))) True
 
+mapSecond :: (a -> b) -> (c, a) -> (c, b)
+mapSecond f (c, a) = (c, f a)
+
 cnfTo3CNF_aux :: [Var] -> [Cls] -> ([Var], [Cls])
 cnfTo3CNF_aux vars []      = (vars, [])
 cnfTo3CNF_aux vars (c:cls)
   | k == 0 = (vars, [c]) -- If there is a clause of length 0 then the CNF is unsatisfiable 
-  | k <= 3 = (newVars, c:newClauses) where 
-    res        = cnfTo3CNF_aux vars cls
-    newVars    = fst res
-    newClauses = snd res
-  | k > 3 = (newVars, newClauses) where 
-    newVarList  = initNewVars (k - 3) vars 
+  | k <= 3 = mapSecond (c:) (cnfTo3CNF_aux vars cls)
+  | k > 3  = (newVars, newClauses) where 
     clause      = literals c 
+    k           = length clause
+    newVarList  = initNewVars (k - 3) vars 
     c1          = BigOr (take 2 clause ++ [Lit (head newVarList) True])
     clauses     = c1 : createClauses (k - 4) vars newVarList c
     updatedVars = newVarList ++ vars
     res         = cnfTo3CNF_aux updatedVars cls
     newVars     = fst res
     newClauses  = clauses ++ snd res
-  where k = length (literals c)
 
 cnfTo3CNF :: CNF -> CNF
 cnfTo3CNF (BigAnd vars clauses) = BigAnd newvars newclauses where
