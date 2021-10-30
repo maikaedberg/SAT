@@ -159,6 +159,18 @@ selectFirstNonempty :: [Cls] -> Maybe Cls
 selectFirstNonempty []      = Nothing 
 selectFirstNonempty (l:ls)  = if null (literals l) then selectFirstNonempty ls else return l
 
+subsumptionAux2 :: Map.Map Lit [Cls] -> [Cls] -> [Cls] -> [(Cls, Lit)]
+subsumptionAux2 occurs s1 []               = [] 
+subsumptionAux2 occurs [] strenghtened     = []
+subsumptionAux2 occurs (c:s1) strengthened = selfSubsume occurs c ++ subsumptionAux2 occurs s1 strengthened
+
+subsumptionAux :: Map.Map Lit [Cls] -> [Cls] -> [Cls] -> [Cls] -> [Cls]
+subsumptionAux occurs [] s1 clauses        = clauses 
+subsumptionAux occurs (c:added) s1 clauses = undefined where 
+  firstLit     = case selectFirstNonempty clauses of
+    Nothing       -> error "Only empty clauses" 
+    Just firstCls -> head (literals firstCls)
+  
 subsumption :: CNF -> CNF
 -- subsumption cnf = BigAnd (vars cnf) (preprocess (clauses cnf))
 subsumption (BigAnd vars clauses) = undefined where 
@@ -171,7 +183,8 @@ subsumption (BigAnd vars clauses) = undefined where
     Just firstCls -> head (literals firstCls)
   firstLitNeg  = negLit firstLit
   s0           = [cls | cls <- clauses, firstLit `elem` literals cls] 
-  s1           = [cls | cls <- clauses, firstLitNeg `elem` literals cls] 
+  s1           = added
+  toStrengthen = concat [selfSubsume occurs c | c <- s1]
 
 newVar :: [Var] -> Var
 newVar = foldr (\v -> max (v+1) ) 1
