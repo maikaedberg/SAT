@@ -9,7 +9,7 @@ type Var = Int
 --data Cls = BigOr  { literals :: Set Lit }                        deriving (Show,Eq)
 --data CNF = BigAnd { vars :: Set Var, clauses  :: Set Cls }         deriving (Show,Eq)
 data Lit = Lit    { var :: Var , pol :: Bool }                 deriving (Ord,Show,Eq)
-data Cls = BigOr  { literals :: [Lit] }                        deriving (Show,Eq)
+data Cls = BigOr  { literals :: [Lit], watched :: [Lit]}                        deriving (Show,Eq)
 data CNF = BigAnd { vars :: [Var], clauses  :: [Cls] }         deriving (Show,Eq)
 
 --type Subst = Set (Var,Bool)

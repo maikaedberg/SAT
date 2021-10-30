@@ -36,7 +36,7 @@ cls :: Int -> Parser Cls
 cls n = do
   ls <- manyTill (lit n) (char '0')
   spaces
-  return (BigOr ls)
+  return (BigOr ls [])
 
 -- parse a comment
 comment :: Parser String
