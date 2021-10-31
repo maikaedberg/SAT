@@ -23,10 +23,12 @@ main = do
   unless (drop (length (args !! 0) - 4) (args !! 0) == ".cnf") $ do
     putStrLn ("Usage: " ++ name ++ " <cnf file>")
     exitFailure
-  unless (expected_flags ["-ss", "-up", "-ple", "-greedy", "-3cnf"] (tail args))$ do
+  unless (expected_flags ["-ss", "-sss", "-up", "-ple", "-greedy", "-3cnf"] (tail args))$ do
     putStrLn ("Unrecognised flag!\n" ++
               "The current optimisations supported are: \n" ++
               "\tsubsumption (-ss)\n" ++ 
+              "\tself-subsumption (-sss)\n" ++
+              "\t3-CNF (-3cnf)\n" ++ 
               "\tunit propogation (-up)\n" ++
               "\tpure literal elimination (-ple)\n" ++
               "\tgreedy clause choosing (-greedy)\n" ++
