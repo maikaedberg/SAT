@@ -27,47 +27,53 @@ condition l (c:cs) =
         Nothing -> condition l cs
         Just filtered ->  filtered:(condition l cs)
 
-find_uc ::  [(Int, [Lit])] -> Maybe Int
-find_uc [] = Nothing
-find_uc ((ind, lit):rest)
-  | lit == [] = Just ind
-  | otherwise = find_uc rest
+find_uc :: [Int] -> [(Lit, [Int])] -> Maybe Int
+find_uc [] _ = Nothing
+find_uc (ind:rest) alt_watch = 
+  case find_uc rest alt_watch of
+    Just i -> Just i
+    Nothing -> 
+      if not (elem ind (concat [snd i | i <- alt_watch]))
+        then Just ind
+        else Nothing
 
-replace :: (Int, [Lit]) -> [(Int, [Lit])] -> [(Int, [Lit])]
-replace _ [] = []
-replace (ind, lits) (x:xs) =
-  if (ind == (fst x))
-    then (ind, lits):xs
-    else replace (ind, lits) xs
-
-new_watches :: Int -> [Cls] -> [(Int, [Lit])] -> Maybe Lit
-new_watches ind curr_clauses curr_watch = 
-  case candidates of
-    [] -> Nothing
-    otherwise -> Just (head candidates)
+find_new_watch :: Lit -> Int -> [Cls] -> [(Lit, [Int])] -> [Lit]
+find_new_watch _ _ _ [] = []
+find_new_watch rid_of ind curr_clauses ((lit, clss) : rest)
+  | rid_of == lit = prev
+  | elem ind clss = lit : prev
+  | elem lit (literals assoc_cls) = lit : prev
+  | otherwise     = prev
   where
-    cls = find_cls ind curr_clauses
-    watched = 
-      case lookup ind curr_watch of
-        Nothing -> []
-        Just s -> s
-    candidates = [l | l <- literals cls, not (elem l watched)]
+    prev = find_new_watch rid_of ind curr_clauses rest
+    assoc_cls = find_cls ind curr_clauses
+    
+replace :: (Lit, [Int]) -> [(Lit, [Int])] -> [(Lit, [Int])]
+replace (lit, ind) [] = []
+replace (lit, ind) ((lit', ind'): rest) =
+  if lit == lit' 
+    then (lit, ind) : rest
+    else replace (lit, ind) rest
 
-update_watchlist :: Lit -> [(Int, Maybe Lit)] -> [(Int, [Lit])] -> [(Int, [Lit])]
-update_watchlist _ [] curr_watch = curr_watch
-update_watchlist to_replace ((ind , newlit) : res) curr_watch =
-  case newlit of
-    Nothing -> replace (ind, []) curr_watch
-    Just s -> replace (ind, [s, other_lit]) curr_watch
+append :: Int -> [Lit] -> [(Lit, [Int])] ->[(Lit, [Int])]
+append _ _ [] = []
+append n lits ((lit, ind) : rest) = 
+  if elem lit lits
+    then (lit, n : ind) : prev
+    else prev
     where
-      other_lit =
-        case lookup ind curr_watch of
-          Nothing -> Lit 0 False False -- will never happen
-          Just lits -> head [l | l <- lits, l /= to_replace]
+      prev = append n lits rest
 
-solve :: [Cls] -> [(Int, [Lit])] -> [Lit] -> Maybe Subst
-solve [] _ _ = Just []
-solve curr_clauses curr_watch all_lit =
+update_altwatch :: Lit -> [Int] -> [Cls] -> [(Lit, [Int])] -> [(Lit, [Int])]
+update_altwatch _ [] _ alt_watch = alt_watch
+update_altwatch rid_of (n: rest) curr_clauses alt_watch = alt_watch''
+  where
+    alt_watch' = replace (rid_of, []) alt_watch
+    alt_watch'' = append n (find_new_watch rid_of n curr_clauses alt_watch) alt_watch'
+
+solve :: [Cls] -> [(Lit, [Int])] -> Maybe Subst
+solve [] _ = Just []
+solve curr_clauses alt_watch =
   if (elem [] (map literals curr_clauses))
     then Nothing -- If it contains an empty clause then it is trivially unsatisfiable
     else
@@ -78,43 +84,42 @@ solve curr_clauses curr_watch all_lit =
             Just l -> Just ((unLit (negLit cond)):l)
             Nothing -> Nothing
     where
-      alt_watch = true_map all_lit (initialize_watched curr_watch)
-      (cond, found_uc, uc_id) = 
-        case find_uc curr_watch of
-          Nothing -> (head (literals (head curr_clauses)), False, 0)
-          Just sub -> (head (literals (find_cls sub curr_clauses)), True, sub)
+
+      (cond, found_uc) = 
+        case find_uc (map index curr_clauses) alt_watch of
+          Nothing -> (head (literals (head curr_clauses)), False)
+          Just sub -> (head (literals (find_cls sub curr_clauses)), True)
 
       to_update_x = 
         case lookup (negLit cond) alt_watch of
           Nothing -> []
-          Just lits -> lits
-      updates_x = [ (n, new_watches n curr_clauses curr_watch ) | n <- to_update_x ]
-      new_watch_x = [ c | c <- update_watchlist (negLit cond) updates_x curr_watch, fst c /= uc_id]
+          Just replace_clss -> replace_clss
+      new_watch_x = update_altwatch (negLit cond) to_update_x curr_clauses alt_watch
 
       to_update_negx = 
         case lookup (cond) alt_watch of
           Nothing -> []
-          Just lits -> lits
-      updates_negx = [ (n, new_watches n curr_clauses curr_watch ) | n <- to_update_negx ]
-      new_watch_negx = update_watchlist cond updates_negx curr_watch
+          Just replace_clss -> replace_clss
+      new_watch_negx = update_altwatch (cond) to_update_negx curr_clauses alt_watch
 
       cond_x    = condition cond curr_clauses
       cond_negx = condition (negLit cond) curr_clauses
-      rho_x     = solve cond_x new_watch_x all_lit
+      rho_x     = solve cond_x new_watch_x
       rho_negx  =
         case found_uc of
           True -> Nothing
           False -> 
-            (solve cond_negx new_watch_negx all_lit)
+            (solve cond_negx new_watch_negx)
 
 solution :: CNF -> Maybe Subst
 solution cnf =
-  case solve curr_clauses curr_watch (all_literals cnf) of
+  case solve curr_clauses alt_watch of
     Nothing -> Nothing
     Just sub -> Just (fill (vars cnf) sub)
   where
     curr_clauses = clauses cnf
     curr_watch = init_watch_aux curr_clauses
+    alt_watch = true_map (all_literals cnf) (initialize_watched curr_watch)
 
 find_cls :: Int -> [Cls] -> Cls
 find_cls i cls
