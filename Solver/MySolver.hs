@@ -248,9 +248,9 @@ cnfTo3CNF (BigAnd vars clauses) = BigAnd newvars newclauses where
 
 solution :: [String] -> CNF -> Maybe Subst
 solution optimisations cnf =
-  case solve optimisations (clauses cnf') of
+  case solve optimisations (clauses cnf'') of
     Nothing -> Nothing
-    Just sub -> Just (fill (vars cnf') sub)
+    Just sub -> Just (fill (vars cnf'') sub)
   where
     cnf' =
       case elem "-ss" optimisations of
