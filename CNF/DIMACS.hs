@@ -29,14 +29,14 @@ lit n = do
   spaces
   let v = abs k
   if v > n then unexpected ("variable " ++ show v ++ " out of bounds (" ++ show n ++ ")")
-  else return (Lit v (v == k))
+  else return (Lit v (v == k) False)
 
 -- parse a clause with variables in range 1..n
 cls :: Int -> Parser Cls
 cls n = do
   ls <- manyTill (lit n) (char '0')
   spaces
-  return (BigOr ls [])
+  return (BigOr ls 0)
 
 -- parse a comment
 comment :: Parser String
@@ -67,7 +67,7 @@ readCNFfromDIMACS file = do
       error ("readDIMACS: parse error")
 
 dimacsLit :: Lit -> String
-dimacsLit (Lit v b) = (if b then "" else "-") ++ show v
+dimacsLit (Lit v b a) = (if b then "" else "-") ++ show v
 
 dimacsCls :: Cls -> String
 dimacsCls c = foldr (\l s -> dimacsLit l ++ " " ++ s) "0" (literals c)
@@ -88,4 +88,4 @@ writeCNFtoDIMACS file f = do
   return ()
 
 dimacsSubst :: [(Var,Bool)] -> String
-dimacsSubst rho = intercalate " " [dimacsLit (Lit v b) | (v,b) <- rho]
+dimacsSubst rho = intercalate " " [dimacsLit (Lit v b True) | (v,b) <- rho]
