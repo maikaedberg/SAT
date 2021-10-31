@@ -86,7 +86,6 @@ solve optimisations clauses =
               False -> Nothing
 
 
-
 filterLit :: Lit -> Cls -> Maybe Cls
 filterLit l c
     | elem l (literals c)          = Nothing -- literal found in clause
@@ -154,10 +153,6 @@ preprocess [] = []
 preprocess (c:cs)
   | elem True [subList y (literals c) | y <- (map literals cs)] = preprocess cs
   | otherwise                         = c:(preprocess cs)
-
-selectFirstNonempty :: [Cls] -> Maybe Cls
-selectFirstNonempty []      = Nothing
-selectFirstNonempty (l:ls)  = if null (literals l) then selectFirstNonempty ls else return l
 
 removeLit :: Cls -> Lit -> Cls
 removeLit clause lit = BigOr [l | l <- literals clause, l /= lit]
