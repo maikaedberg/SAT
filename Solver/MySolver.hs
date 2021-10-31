@@ -111,13 +111,13 @@ subset :: Cls -> Cls -> Bool
 subset cls1 cls2 =  computeSignature cls1 .&. complement (computeSignature cls2) == 0 && subList (literals cls1) (literals cls2)
 
 findSmallestOccur :: Map.Map Lit [Cls] -> Cls -> Lit
-findSmallestOccur occur (BigOr [])     = error "Called findSmallestOccur on empty list"  
+findSmallestOccur occur (BigOr [])     = error "Called findSmallestOccur on empty list"
 findSmallestOccur occur (BigOr [l])    = l
-findSmallestOccur occur (BigOr (l:ls)) = case Map.lookup l occur of 
+findSmallestOccur occur (BigOr (l:ls)) = case Map.lookup l occur of
   Nothing -> error "literal does not occur in any clause"
-  Just clause -> case Map.lookup prevL occur of 
+  Just clause -> case Map.lookup prevL occur of
     Nothing      -> error "literal does not occur in any clause"
-    Just prevCls ->  if length clause > length prevCls then l else prevL 
+    Just prevCls ->  if length clause > length prevCls then l else prevL
   where
     prevL =  findSmallestOccur occur (BigOr ls)
 
@@ -129,12 +129,12 @@ findSubsumed occurs cls        = case Map.lookup (findSmallestOccur occurs cls) 
                             clause /= cls,
                             length (literals clause) <= lenCls,
                             subset clause cls]
-  where 
+  where
     lenCls = length (literals cls)
 
-selfSubsume :: Map.Map Lit [Cls] -> Cls -> [(Cls, Lit)]
-selfSubsume occurs cls = concat [toStrenghten p | p <- literals cls] where 
-  toStrenghten p = [(cls', pNeg) | cls' <- subsumed] where 
+selfSubsume :: Map.Map Lit [Cls] -> Cls -> (Cls, [(Cls, Lit)])
+selfSubsume occurs cls = (cls, concat [toStrenghten p | p <- literals cls]) where
+  toStrenghten p = [(cls', pNeg) | cls' <- subsumed] where
     pNeg     = negLit p
     clsNeg   = BigOr [ if lit /= p then lit else pNeg | lit <- literals cls]
     subsumed = findSubsumed occurs clsNeg
@@ -142,12 +142,12 @@ selfSubsume occurs cls = concat [toStrenghten p | p <- literals cls] where
 updateMap :: Cls -> Cls -> Map.Map Lit [Cls] -> Map.Map Lit [Cls]
 updateMap (BigOr []) c occurs     = occurs
 updateMap (BigOr (l:ls)) c occurs = case Map.lookup l occurs of
-  Nothing  -> Map.insert l [c] occurs 
+  Nothing  -> Map.insert l [c] occurs
   Just cls -> Map.insert l (c:cls) occurs
 
 buildOccurs :: CNF -> Map.Map Lit [Cls]
 buildOccurs (BigAnd vars [])      = Map.empty
-buildOccurs (BigAnd vars (c:cls)) = updateMap c c (buildOccurs (BigAnd vars cls))  
+buildOccurs (BigAnd vars (c:cls)) = updateMap c c (buildOccurs (BigAnd vars cls))
 
 preprocess :: [Cls] -> [Cls]
 preprocess [] = []
@@ -156,35 +156,54 @@ preprocess (c:cs)
   | otherwise                         = c:(preprocess cs)
 
 selectFirstNonempty :: [Cls] -> Maybe Cls
-selectFirstNonempty []      = Nothing 
+selectFirstNonempty []      = Nothing
 selectFirstNonempty (l:ls)  = if null (literals l) then selectFirstNonempty ls else return l
 
-subsumptionAux2 :: Map.Map Lit [Cls] -> [Cls] -> [Cls] -> [(Cls, Lit)]
-subsumptionAux2 occurs s1 []               = [] 
-subsumptionAux2 occurs [] strenghtened     = []
-subsumptionAux2 occurs (c:s1) strengthened = selfSubsume occurs c ++ subsumptionAux2 occurs s1 strengthened
+removeLit :: Cls -> Lit -> Cls
+removeLit clause lit = BigOr [l | l <- literals clause, l /= lit]
 
-subsumptionAux :: Map.Map Lit [Cls] -> [Cls] -> [Cls] -> [Cls] -> [Cls]
-subsumptionAux occurs [] s1 clauses        = clauses 
-subsumptionAux occurs (c:added) s1 clauses = undefined where 
-  firstLit     = case selectFirstNonempty clauses of
-    Nothing       -> error "Only empty clauses" 
-    Just firstCls -> head (literals firstCls)
-  
+strengthenClause :: [Cls] -> (Cls,[(Cls, Lit)]) -> [Cls]
+strengthenClause clauses (ogCls, [])           = clauses
+strengthenClause clauses (ogCls, (c, lit):cls) = [if clause == c then removeLit clause lit else clause | clause <- clauses, clause /= ogCls]
+
+strengthenClauses :: [Cls] -> [(Cls,[(Cls, Lit)])] -> [Cls]
+strengthenClauses clauses []         = clauses 
+strengthenClauses clauses [cl]       = strengthenClause clauses cl
+strengthenClauses clauses (cl : cls) = strengthenClauses (strengthenClause clauses cl) cls
+
+subsumptionAux2 :: Map.Map Lit [Cls] -> [Cls] -> [(Cls,[(Cls, Lit)])]
+subsumptionAux2 occurs = map (selfSubsume occurs)
+
+subsumptionAux :: [Var] -> Map.Map Lit [Cls] -> Lit -> [Cls] -> [Cls] -> [Cls] -> [Cls]
+subsumptionAux [] occurs firstLit s1 clauses strengthened   = clauses
+subsumptionAux vars occurs firtsLit s1 clauses []           = clauses
+subsumptionAux (v:vars) occurs firstLit s1 clauses strengthened = subsumptionAux vars occurs newFirstLit newS1 newClauses newStrengthened where
+  toStrengthen    = case subsumptionAux2 occurs s1 of
+    [] -> []
+    toStrengthenTemp -> subsumptionAux2 occurs newS1 where
+      firstLitNeg = negLit firstLit
+      clauses     = strengthenClauses clauses toStrengthenTemp
+      newTempS1   = [cls | cls <- clauses, firstLitNeg `elem` literals cls]
+      newS1       = map fst toStrengthenTemp `union` newTempS1
+  newClauses      = strengthenClauses clauses toStrengthen
+  newStrengthened = nub (map fst (concatMap snd toStrengthen))
+  newFirstLit     = Lit v True
+  negFirstLit     = negLit newFirstLit
+  newTempS1       = [cls | cls <- newClauses, negFirstLit `elem` literals cls] 
+  newS1           = newTempS1 `union` newStrengthened
+
 subsumption :: CNF -> CNF
--- subsumption cnf = BigAnd (vars cnf) (preprocess (clauses cnf))
-subsumption (BigAnd vars clauses) = undefined where 
-  touched      = Set.fromList vars 
-  added        = clauses
+subsumption (BigAnd vars clauses) = BigAnd vars (subsumptionAux (tail vars) occurs firstLit s1 clauses strengthened) where
+  touched      = Set.fromList vars
   strengthened = []
   occurs       = buildOccurs (BigAnd vars clauses)
-  firstLit     = case selectFirstNonempty clauses of
-    Nothing       -> error "Only empty clauses" 
-    Just firstCls -> head (literals firstCls)
+  firstLit     = case vars of
+    []       -> error "No variables"
+    otheriwse -> Lit (head vars) True
   firstLitNeg  = negLit firstLit
-  s0           = [cls | cls <- clauses, firstLit `elem` literals cls] 
-  s1           = added
-  toStrengthen = concat [selfSubsume occurs c | c <- s1]
+  s0           = [cls | cls <- clauses, firstLit `elem` literals cls]
+  s1           = clauses
+  toStrengthen = [selfSubsume occurs c | c <- s1]
 
 newVar :: [Var] -> Var
 newVar = foldr (\v -> max (v+1) ) 1
