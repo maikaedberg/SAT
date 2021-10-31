@@ -28,7 +28,9 @@ main = do
               "The current optimisations supported are: \n" ++
               "\tsubsumption (-ss)\n" ++ 
               "\tunit propogation (-up)\n" ++
-              "\tpure literal elimination (-ple)")
+              "\tpure literal elimination (-ple)\n" ++
+              "\tgreedy clause choosing (-greedy)\n" ++
+              "\t3-cnf (-3cnf)\n")
     exitFailure
   f <- readCNFfromDIMACS (args !! 0)
   --case Naive.solution f of
