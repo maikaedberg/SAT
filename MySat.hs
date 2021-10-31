@@ -34,6 +34,9 @@ main = do
   --case Naive.solution f of
   --  Nothing  -> putStrLn "UNSAT"
   --  Just rho -> putStrLn ("NAIVE SAT\n" ++ dimacsSubst rho)
+  --case TwoWatch.solution f of
+  --  Nothing  -> putStrLn "UNSAT"
+  --  Just rho -> putStrLn ("NAIVE SAT\n" ++ dimacsSubst rho)
   case MySolver.solution (tail args) f of
     Nothing  -> putStrLn "UNSAT"
     Just rho -> putStrLn ("MY SAT\n" ++ dimacsSubst rho ++ sol_right)
