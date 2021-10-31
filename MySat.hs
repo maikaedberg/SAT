@@ -3,6 +3,7 @@ import CNF.DIMACS
 import qualified CNF.Eval as Eval
 
 --import qualified Solver.Naive as Naive
+--import qualified Solver.TwoWatch as TwoWatch
 import qualified Solver.MySolver as MySolver
 
 import Control.Monad
@@ -31,8 +32,7 @@ main = do
               "\t3-CNF (-3cnf)\n" ++ 
               "\tunit propogation (-up)\n" ++
               "\tpure literal elimination (-ple)\n" ++
-              "\tgreedy clause choosing (-greedy)\n" ++
-              "\t3-cnf (-3cnf)\n")
+              "\tgreedy clause choosing (-greedy)")
     exitFailure
   f <- readCNFfromDIMACS (args !! 0)
   --case Naive.solution f of
